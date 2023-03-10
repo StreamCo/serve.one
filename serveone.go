@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -12,6 +14,9 @@ import (
 	"os"
 	"path"
 	"sync"
+
+	"golang.ngrok.com/ngrok"
+	"golang.ngrok.com/ngrok/config"
 )
 
 func main() {
@@ -116,20 +121,14 @@ function doTheNeedful() {
 }
 </script>`)
 	})
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "5000"
+	ctx := context.Background()
+	l, err := ngrok.Listen(ctx,
+		config.HTTPEndpoint(),
+		ngrok.WithAuthtokenFromEnv(),
+	)
+	if err != nil {
+		log.Fatal(err)
 	}
-	host := os.Getenv("HOST")
-	if host == "" {
-		host = "http://localhost"
-	}
-
-	domain := make([]byte, 12)
-	if _, err := io.ReadFull(rand.Reader, domain); err != nil {
-		panic(err.Error())
-	}
-	log.Printf("ok, now run:\n\tngrok http -subdomain %x %s\nand send your mate this path:\n\thttps://%x.ngrok.io/?filename=%s&nonce=%x#%x", domain, port, domain, path.Base(filename), nonce, key)
-	log.Printf("starting server on port %s", port)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	fmt.Printf("https://%s/?filename=%s&nonce=%x#%x\n", l.Addr(), path.Base(filename), nonce, key)
+	http.Serve(l, nil)
 }
